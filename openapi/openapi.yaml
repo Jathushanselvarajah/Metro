@@ -48,7 +48,63 @@ paths:
                     type: string
                     example: "12:34"
         "400":
-          description: Paramètre manquant
+          description: Paramètre manquant ou invalide
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+  /last-metro:
+    get:
+      summary: Dernier passage de métro via la DB
+      parameters:
+        - in: query
+          name: station
+          schema:
+            type: string
+          required: true
+          description: Nom de la station (Nation, Chatelet)
+      responses:
+        "200":
+          description: Dernier passage connu
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  station:
+                    type: string
+                  lastMetro:
+                    type: string
+                    example: "01:15"
+                  line:
+                    type: string
+                    example: "M1"
+                  tz:
+                    type: string
+                    example: "Europe/Paris"
+        "400":
+          description: Paramètre station manquant
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+        "404":
+          description: Station inconnue
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+        "500":
+          description: Erreur serveur
           content:
             application/json:
               schema:
