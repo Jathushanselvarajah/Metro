@@ -1,0 +1,20 @@
+services:
+  api:
+    build:
+      context: ./api
+      dockerfile: Dockerfile.v1
+    image: derniermetro-api:v1
+    environment:
+      - PORT=5000
+    ports:
+      - "5000:5000"
+  swagger:
+    image: swaggerapi/swagger-ui
+    environment:
+      - SWAGGER_JSON=/openapi/openapi.yaml
+    volumes:
+      - ./openapi/openapi.yaml:/openapi/openapi.yaml:ro
+    ports:
+      - "8080:8080"
+    depends_on:
+      - api
