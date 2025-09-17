@@ -160,6 +160,57 @@ app.get("/next-metro", (req, res) => {
   });
 });
 
+//Route last-metro
+app.get("/last-metro", async (req, res) => {
+  const station = req.query.station;
+  if (!station || station.trim() === "") {
+    return res.status(400).json({ error: "missing station" });
+  }
+
+  try {
+    // Récupérer metro.defaults
+    const defaultsRes = await dbPool.query(
+      "SELECT value FROM config WHERE key = $1",
+      ["metro.defaults"]
+    );
+    if (defaultsRes.rows.length === 0) {
+      return res.status(500).json({ error: "metro.defaults not found" });
+    }
+    const defaults = defaultsRes.rows[0].value;
+
+    // Récupérer metro.last
+    const lastRes = await dbPool.query(
+      "SELECT value FROM config WHERE key = $1",
+      ["metro.last"]
+    );
+    if (lastRes.rows.length === 0) {
+      return res.status(500).json({ error: "metro.last not found" });
+    }
+    const lastMap = lastRes.rows[0].value;
+
+    // Chercher station insensible à la casse
+    const stationLower = station.toLowerCase();
+    const foundStation = Object.keys(lastMap).find(
+      (key) => key.toLowerCase() === stationLower
+    );
+
+    if (!foundStation) {
+      return res.status(404).json({ error: "unknown station" });
+    }
+
+    // Réponse JSON
+    res.status(200).json({
+      station: foundStation,
+      lastMetro: lastMap[foundStation],
+      line: defaults.line || "M1",
+      tz: defaults.tz || "Europe/Paris",
+    });
+  } catch (error) {
+    console.error("Error /last-metro:", error);
+    res.status(500).json({ error: "internal server error" });
+  }
+});
+
 app.get("/test-time", (req, res) => {
   const timeStr = req.query.time; // format "HH:MM"
   if (!timeStr) {
