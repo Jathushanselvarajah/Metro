@@ -1,8 +1,11 @@
 const express = require("express");
 const cors = require("cors");
 const { DateTime } = require("luxon");
-const app = express();
 const { Pool } = require("pg");
+
+const { calculateNextArrival } = require("./utils/time");
+
+const app = express();
 const PORT = process.env.PORT || 3000;
 
 const dbPool = new Pool({
@@ -32,63 +35,6 @@ function parseTimeHM(hm) {
   return { h, m };
 }
 
-// Fonction de calcul du prochain passage
-function calculateNextArrival(
-  now = DateTime.now().setZone("Europe/Paris"),
-  headwayMin = 3
-) {
-  const tz = "Europe/Paris";
-
-  const toHM = (d) => d.toFormat("HH:mm");
-
-  // Début service 05:30
-  const start = now.set({ hour: 5, minute: 30, second: 0, millisecond: 0 });
-  // Fin service 01:15 (le lendemain)
-  let end = now.set({ hour: 1, minute: 15, second: 0, millisecond: 0 });
-
-  let nowTime = now.toMillis();
-  const startTime = start.toMillis();
-  let endTime = end.toMillis();
-
-  // Gestion plage traversant minuit
-  if (endTime <= startTime) {
-    endTime += 24 * 60 * 60 * 1000;
-    if (nowTime < startTime) {
-      nowTime += 24 * 60 * 60 * 1000;
-    }
-  }
-
-  if (nowTime < startTime || nowTime > endTime) {
-    return { service: "closed", tz };
-  }
-
-  // Gestion isLast entre 00:45 et 01:15
-  let lastWindow = now.set({ hour: 0, minute: 45, second: 0, millisecond: 0 });
-  let serviceEnd = now.set({ hour: 1, minute: 15, second: 0, millisecond: 0 });
-
-  let nowAdjusted = now.toMillis();
-  let lastWindowTime = lastWindow.toMillis();
-  let serviceEndTime = serviceEnd.toMillis();
-
-  if (serviceEndTime <= lastWindowTime) {
-    serviceEndTime += 24 * 60 * 60 * 1000;
-    if (nowAdjusted < lastWindowTime) {
-      nowAdjusted += 24 * 60 * 60 * 1000;
-    }
-  }
-
-  const isLast = nowAdjusted >= lastWindowTime && nowAdjusted <= serviceEndTime;
-
-  const next = now.plus({ minutes: headwayMin });
-
-  return {
-    nextArrival: toHM(next),
-    isLast,
-    headwayMin,
-    tz,
-  };
-}
-
 // Middleware pour logs
 app.use((req, res, next) => {
   const t0 = Date.now();
@@ -113,7 +59,6 @@ app.get("/next-metro", (req, res) => {
   if (isNaN(n) || n < 1) n = 1;
   if (n > 5) n = 5;
 
-  // Vérification station
   if (!station) {
     return res.status(400).json({ error: "missing station" });
   }
@@ -122,14 +67,12 @@ app.get("/next-metro", (req, res) => {
     (s) => s.toLowerCase() === stationLower
   );
   if (!stationMatch) {
-    // Rechercher suggestions basé sur préfixe ou substring
     const suggestions = stationsKnown.filter((s) =>
       s.toLowerCase().includes(stationLower)
     );
     return res.status(404).json({ error: "unknown station", suggestions });
   }
 
-  // Calcul multiple passages
   const passages = [];
   const now = DateTime.now().setZone("Europe/Paris");
   for (let i = 0; i < n; i++) {
@@ -137,7 +80,6 @@ app.get("/next-metro", (req, res) => {
     passages.push(arrivalTime.toFormat("HH:mm"));
   }
 
-  // Vérification plage horaire
   const { nextArrival, isLast, headwayMin, tz, service } = calculateNextArrival(
     now,
     HEADWAY_MIN,
@@ -149,7 +91,6 @@ app.get("/next-metro", (req, res) => {
     return res.status(200).json({ service, tz });
   }
 
-  // Réponse
   res.status(200).json({
     station,
     line: "M1",
@@ -160,7 +101,7 @@ app.get("/next-metro", (req, res) => {
   });
 });
 
-//Route last-metro
+// Route /last-metro
 app.get("/last-metro", async (req, res) => {
   const station = req.query.station;
   if (!station || station.trim() === "") {
@@ -168,7 +109,6 @@ app.get("/last-metro", async (req, res) => {
   }
 
   try {
-    // Récupérer metro.defaults
     const defaultsRes = await dbPool.query(
       "SELECT value FROM config WHERE key = $1",
       ["metro.defaults"]
@@ -178,7 +118,6 @@ app.get("/last-metro", async (req, res) => {
     }
     const defaults = defaultsRes.rows[0].value;
 
-    // Récupérer metro.last
     const lastRes = await dbPool.query(
       "SELECT value FROM config WHERE key = $1",
       ["metro.last"]
@@ -188,7 +127,6 @@ app.get("/last-metro", async (req, res) => {
     }
     const lastMap = lastRes.rows[0].value;
 
-    // Chercher station insensible à la casse
     const stationLower = station.toLowerCase();
     const foundStation = Object.keys(lastMap).find(
       (key) => key.toLowerCase() === stationLower
@@ -198,7 +136,6 @@ app.get("/last-metro", async (req, res) => {
       return res.status(404).json({ error: "unknown station" });
     }
 
-    // Réponse JSON
     res.status(200).json({
       station: foundStation,
       lastMetro: lastMap[foundStation],
@@ -222,7 +159,6 @@ app.get("/test-time", (req, res) => {
     return res.status(400).json({ error: "invalid time format" });
   }
 
-  // fixe l'heure personnalisée dans now
   const now = DateTime.now()
     .setZone("Europe/Paris")
     .set({ hour: h, minute: m, second: 0, millisecond: 0 });
