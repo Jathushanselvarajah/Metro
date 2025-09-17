@@ -2,7 +2,16 @@ const express = require("express");
 const cors = require("cors");
 const { DateTime } = require("luxon");
 const app = express();
+const { Pool } = require("pg");
 const PORT = process.env.PORT || 3000;
+
+const dbPool = new Pool({
+  user: process.env.POSTGRES_USER,
+  password: process.env.POSTGRES_PASSWORD,
+  database: process.env.POSTGRES_DB,
+  host: process.env.POSTGRES_HOST || "db",
+  port: process.env.POSTGRES_PORT,
+});
 
 app.use(cors());
 
@@ -173,6 +182,15 @@ app.get("/test-time", (req, res) => {
     return res.json({ service, tz });
   } else {
     return res.json({ service: "open", tz });
+  }
+});
+
+app.get("/db-health", async (req, res) => {
+  try {
+    const result = await dbPool.query("SELECT 1 as test");
+    res.status(200).json({ db: "ok", result: result.rows[0] });
+  } catch (error) {
+    res.status(500).json({ db: "error", error: error.message });
   }
 });
 
