@@ -1,4 +1,6 @@
 const express = require("express");
+require("dotenv").config();
+
 const cors = require("cors");
 const { DateTime } = require("luxon");
 const { Pool } = require("pg");
@@ -188,6 +190,10 @@ app.use((req, res) => {
 });
 
 // Lancement du serveur
-app.listen(PORT, () => {
-  console.log(`Server is running on port ${PORT}`);
-});
+if (process.env.NODE_ENV !== "test") {
+  app.listen(PORT, () => {
+    console.log(`Server is running on port ${PORT}`);
+  });
+}
+
+module.exports = app;
