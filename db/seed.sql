@@ -2,6 +2,7 @@
 -- Safe to re-run: upserts on conflict
 
 INSERT INTO public.config (key, value) VALUES 
-('metro.last', '{"Chatelet": "01:15", "Nation": "01:20"}'::jsonb)
+('metro.last', '{"Chatelet": "01:15", "Nation": "01:20"}'::jsonb),
+('metro.defaults', '{"line": "M1", "tz": "Europe/Paris"}'::jsonb)
 ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value;
 

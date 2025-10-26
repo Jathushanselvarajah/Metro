@@ -4,7 +4,9 @@
   "description": "",
   "main": "index.js",
   "scripts": {
-    "test": "jest --forceExit"
+    "test": "jest",
+    "test:coverage": "jest --coverage",
+    "test:integration": "jest -c jest.integration.config.js"
   },
   "keywords": [],
   "author": "",
