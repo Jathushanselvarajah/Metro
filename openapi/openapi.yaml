@@ -1,7 +1,7 @@
 openapi: 3.0.3
 info:
   title: Dernier Métro API
-  version: 1.0.0
+  version: 1.1.0
 servers:
   - url: http://localhost:5000
 paths:
@@ -14,12 +14,10 @@ paths:
           content:
             application/json:
               schema:
-                type: object
-                properties:
-                  status:
-                    type: string
-                  service:
-                    type: string
+                $ref: "#/components/schemas/Health"
+              examples:
+                ok:
+                  value: { status: "ok" }
   /next-metro:
     get:
       summary: Prochain passage de métro
@@ -29,33 +27,59 @@ paths:
           schema:
             type: string
           required: true
-          description: Nom de la station
+          description: Nom de la station (Nation, Chatelet)
+        - in: query
+          name: n
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 5
+          required: false
+          description: Nombre de passages (1-5, défaut 1)
       responses:
         "200":
-          description: Heure d'arrivée estimée
+          description: Résultat (service ouvert ou fermé)
           content:
             application/json:
               schema:
-                type: object
-                properties:
-                  station:
-                    type: string
-                  line:
-                    type: string
-                  headwayMin:
-                    type: integer
-                  nextArrival:
-                    type: string
-                    example: "12:34"
+                oneOf:
+                  - $ref: "#/components/schemas/NextMetroOpen"
+                  - $ref: "#/components/schemas/NextMetroClosed"
+              examples:
+                open:
+                  value:
+                    {
+                      station: "Chatelet",
+                      line: "M1",
+                      headwayMin: 3,
+                      nextArrivals: ["12:34", "12:37"],
+                      isLast: false,
+                      tz: "Europe/Paris",
+                    }
+                closed:
+                  value: { service: "closed", tz: "Europe/Paris" }
         "400":
           description: Paramètre manquant ou invalide
           content:
             application/json:
               schema:
-                type: object
-                properties:
-                  error:
-                    type: string
+                $ref: "#/components/schemas/Error"
+              examples:
+                missing:
+                  value: { error: "missing station" }
+        "404":
+          description: Station inconnue
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SuggestionsError"
+              examples:
+                unknown:
+                  value:
+                    {
+                      error: "unknown station",
+                      suggestions: ["Nation", "Concorde"],
+                    }
   /last-metro:
     get:
       summary: Dernier passage de métro via la DB
@@ -72,43 +96,153 @@ paths:
           content:
             application/json:
               schema:
-                type: object
-                properties:
-                  station:
-                    type: string
-                  lastMetro:
-                    type: string
-                    example: "01:15"
-                  line:
-                    type: string
-                    example: "M1"
-                  tz:
-                    type: string
-                    example: "Europe/Paris"
+                $ref: "#/components/schemas/LastMetro"
+              examples:
+                nation:
+                  value:
+                    {
+                      station: "Nation",
+                      lastMetro: "01:20",
+                      line: "M1",
+                      tz: "Europe/Paris",
+                    }
         "400":
           description: Paramètre station manquant
           content:
             application/json:
               schema:
-                type: object
-                properties:
-                  error:
-                    type: string
+                $ref: "#/components/schemas/Error"
+              examples:
+                missing:
+                  value: { error: "missing station" }
         "404":
           description: Station inconnue
           content:
             application/json:
               schema:
-                type: object
-                properties:
-                  error:
-                    type: string
+                $ref: "#/components/schemas/Error"
+              examples:
+                notFound:
+                  value: { error: "unknown station" }
         "500":
           description: Erreur serveur
           content:
             application/json:
               schema:
-                type: object
-                properties:
-                  error:
-                    type: string
+                $ref: "#/components/schemas/Error"
+              examples:
+                config:
+                  value: { error: "metro.defaults not found" }
+  /db-health:
+    get:
+      summary: Vérifie la connexion à la base de données
+      responses:
+        "200":
+          description: DB OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DBHealth"
+              examples:
+                ok:
+                  value: { db: "ok", result: { test: 1 } }
+        "500":
+          description: Erreur DB
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+              examples:
+                error:
+                  value: { error: "connection error" }
+  /test-time:
+    get:
+      summary: Teste l'état de service à une heure donnée
+      parameters:
+        - in: query
+          name: time
+          required: true
+          schema:
+            type: string
+            example: "00:50"
+          description: Heure HH:MM (Europe/Paris)
+      responses:
+        "200":
+          description: État du service pour cette heure
+          content:
+            application/json:
+              schema:
+                oneOf:
+                  - $ref: "#/components/schemas/TestTimeOpen"
+                  - $ref: "#/components/schemas/NextMetroClosed"
+              examples:
+                open:
+                  value: { service: "open", tz: "Europe/Paris" }
+                closed:
+                  value: { service: "closed", tz: "Europe/Paris" }
+        "400":
+          description: Paramètre manquant ou invalide
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+              examples:
+                invalid:
+                  value: { error: "invalid time format" }
+
+components:
+  schemas:
+    Health:
+      type: object
+      properties:
+        status: { type: string, example: ok }
+    NextMetroOpen:
+      type: object
+      properties:
+        station: { type: string, example: Chatelet }
+        line: { type: string, example: M1 }
+        headwayMin: { type: integer, example: 3 }
+        nextArrivals:
+          type: array
+          items: { type: string }
+          example: ["12:34", "12:37", "12:40"]
+        isLast: { type: boolean, example: false }
+        tz: { type: string, example: Europe/Paris }
+    NextMetroClosed:
+      type: object
+      properties:
+        service: { type: string, example: closed }
+        tz: { type: string, example: Europe/Paris }
+    LastMetro:
+      type: object
+      properties:
+        station: { type: string, example: Nation }
+        lastMetro: { type: string, example: "01:15" }
+        line: { type: string, example: M1 }
+        tz: { type: string, example: Europe/Paris }
+    DBHealth:
+      type: object
+      properties:
+        db: { type: string, example: ok }
+        result:
+          type: object
+          properties:
+            test: { type: integer, example: 1 }
+    TestTimeOpen:
+      type: object
+      properties:
+        service: { type: string, example: open }
+        tz: { type: string, example: Europe/Paris }
+    Error:
+      type: object
+      properties:
+        error: { type: string, example: missing station }
+    SuggestionsError:
+      allOf:
+        - $ref: "#/components/schemas/Error"
+        - type: object
+          properties:
+            suggestions:
+              type: array
+              items: { type: string }
+              example: ["Concorde", "Bastille"]
