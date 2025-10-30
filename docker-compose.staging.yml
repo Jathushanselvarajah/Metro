@@ -1,0 +1,44 @@
+version: "3.9"
+
+services:
+  api:
+    image: ghcr.io/jathushanselvarajah/dernier-metro-api:latest
+    platform: linux/amd64   # <- ajouté
+    container_name: metro-api-staging
+    env_file:
+      - .env.staging
+    environment:
+      - NODE_ENV=staging
+      - PORT=5001
+      - POSTGRES_HOST=postgres-staging
+      - POSTGRES_DB=${POSTGRES_DB}
+      - POSTGRES_USER=${POSTGRES_USER}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+    depends_on:
+      - postgres-staging
+    ports:
+      - "5002:5001" # host:container
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:5001/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 5s
+
+  postgres-staging:
+    image: postgres:16-alpine
+    container_name: metro-postgres-staging
+    environment:
+      - POSTGRES_DB=${POSTGRES_DB}
+      - POSTGRES_USER=${POSTGRES_USER}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+    volumes:
+      - pgdata-staging:/var/lib/postgresql/data
+      # Apply schema + seed on first init only
+      - ./db:/docker-entrypoint-initdb.d:ro
+    restart: unless-stopped
+
+volumes:
+  pgdata-staging:
+    driver: local
