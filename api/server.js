@@ -163,4 +163,7 @@ if (process.env.NODE_ENV !== "test") {
   app.listen(PORT, () => console.log(`Server is running on port ${PORT}`));
 }
 
-module.exports = { app, dbPool };
+// Exporter l'instance Express directement pour supertest
+// et attacher le pool à l'app pour le teardown global des tests
+app.dbPool = dbPool;
+module.exports = app;
