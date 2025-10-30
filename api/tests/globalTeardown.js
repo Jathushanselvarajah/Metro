@@ -5,8 +5,8 @@ module.exports = async () => {
   if (app && app.dbPool) {
     try {
       await app.dbPool.end();
-    } catch (e) {
-      // ignore
+    } catch {
+      // ignored
     }
   }
 };

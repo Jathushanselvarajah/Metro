@@ -1,5 +1,5 @@
 TN:
-SF:src\lib\time2.js
+SF:src/lib/time2.js
 FN:6,assertValidDate
 FN:22,formatHHMM
 FN:35,computeNextHHMM
