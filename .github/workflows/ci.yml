@@ -127,6 +127,15 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
+      - name: Compute lowercase image repo
+        id: repo
+        shell: bash
+        run: |
+          OWNER_LC=$(echo "${{ github.repository_owner }}" | tr '[:upper:]' '[:lower:]')
+          IMAGE="ghcr.io/${OWNER_LC}/dernier-metro-api"
+          echo "owner=${OWNER_LC}" >> "$GITHUB_OUTPUT"
+          echo "image=${IMAGE}" >> "$GITHUB_OUTPUT"
+
       - name: Build and push Docker image
         uses: docker/build-push-action@v5
         with:
@@ -134,5 +143,5 @@ jobs:
           file: ./api/Dockerfile.v1
           push: true
           tags: |
-            ghcr.io/${{ github.repository_owner }}/dernier-metro-api:latest
-            ghcr.io/${{ github.repository_owner }}/dernier-metro-api:${{ github.sha }}
+            ${{ steps.repo.outputs.image }}:latest
+            ${{ steps.repo.outputs.image }}:${{ github.sha }}
